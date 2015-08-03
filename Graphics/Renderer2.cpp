@@ -155,6 +155,17 @@ static PipelineState GetScreenSpacePass_PipelineState()
 	return screenSpacePass_pipelineState;
 }
 
+static ShaderDesc GetScreenSpacePass_Downscale4x4_ShaderDesc()
+{
+	return
+	{
+		// Active stages
+		{ true, false, false, false, true },
+		// Stages filenames
+		{ "screenQuadById.vert", "", "", "", "downscale4x4.frag" }
+	};
+}
+
 static RenderPassDesc Downscale2x2_ScreenPassDesc{
 	std::vector<RenderPassTextureInputDesc>{
 		{0, "SceneRender", -666}
@@ -192,41 +203,54 @@ static RenderPassDesc Downscale2x2_ScreenPassDesc{
 	false
 };
 
+static RenderPassDesc GetStandardIntermediateScreenSpaceDesc(
+	EFBOTargetSizeMode eStandardDownscaleMode, EFBOTargetBeforeResizeModifier eStandardPreDownscaleModifier,
+	const std::string& strFragmentShader)
+{
+	
+	DogeAssert(eStandardDownscaleMode != EFBOTargetSizeMode_CUSTOM_SIZE &&
+		eStandardDownscaleMode != EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_CUSTOM &&
+		eStandardDownscaleMode != EFBOTargetSizeMode_USE_SCREEN_DOWNSCALED_CUSTOM);
+
+	DogeAssert(eStandardPreDownscaleModifier != EFBOTargetBeforeResizeModifier_ROUND_NEXT_CUSTOM);
+
+	return{
+		/*inTextures : */		std::vector<RenderPassTextureInputDesc>{{0, "", -666}},
+		/*FBODesc : */			RenderPassFBODesc{ 
+			/*useDefaultColor : */	false, 
+			/*useDefaultDepth : */	true,
+			/*fboSizeHeuristic : */	{
+				eStandardDownscaleMode, {}, {},
+				eStandardPreDownscaleModifier, {}
+			},
+			/*colorTargets : */		std::vector<FBOColorEntryDesc>{{ "", -666, EFBOTargetClearMode_NO_CLEAR, {} }},
+			/*depthTarget : */		FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
+		},
+		/*shaderDesc : */		ShaderDesc{
+			{ true, false, false, false, true },
+			{ "screenQuadById.vert", "", "", "", strFragmentShader }
+		},
+		/*pipelineState : */	GetScreenSpacePass_PipelineState(),
+		/*inputType : */		EPassInputType_ScreenQuadById,
+		/*inputVisibility : */	EVisibility_Any,
+		/*isLighting : */		false
+	};
+}
+
 static RenderPassDesc Downscale4x4_ScreenPassDesc{
-	std::vector<RenderPassTextureInputDesc>{
-		{0, "", -666}
-	},
-		RenderPassFBODesc{
-		false, true,
-		{
-			EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4,
-			{},
-			{},
-			EFBOTargetBeforeResizeModifier_ROUND_NEXT_W8_H8,
-			{}
+	/*inTextures : */		std::vector<RenderPassTextureInputDesc>{{0, "", -666}},
+	/*FBODesc : */			RenderPassFBODesc{ false, true, {
+			EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4,{},{},
+			EFBOTargetBeforeResizeModifier_ROUND_NEXT_W8_H8,{}
 		},
-		std::vector<FBOColorEntryDesc>{
-			{ "SceneRenderDownscaled4x4", -666, EFBOTargetClearMode_NO_CLEAR, {} }
-		},
-			FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
+		std::vector<FBOColorEntryDesc>{{ "", -666, EFBOTargetClearMode_NO_CLEAR, {} }},
+		FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
 	},
-	// Shader
-	{
-		// Active stages
-		{ true, false, false, false, true },
-		// Stages filenames
-		{ "screenQuadById.vert", "", "", "", "downscale4x4.frag" }
-	},
-
-	// Pipeline state
-	GetScreenSpacePass_PipelineState(),
-
-	// Input type and its visibility if any
-	EPassInputType_ScreenQuadById,
-	EVisibility_Any,
-
-	// Is lighting
-	false
+	/*shaderDesc : */		GetScreenSpacePass_Downscale4x4_ShaderDesc(),
+	/*pipelineState : */	GetScreenSpacePass_PipelineState(),
+	/*inputType : */		EPassInputType_ScreenQuadById,
+	/*inputVisibility : */	EVisibility_Any,
+	/*isLighting : */		false
 };
 
 
@@ -311,7 +335,10 @@ static RenderGraphDesc defaultRenderGraph_ScenePhotoDesc{
 		Simple3D_3DPassDesc,
 		//Downscale2x2_ScreenPassDesc,
 		Downscale4x4_ScreenPassDesc,
-		Downscale4x4_ScreenPassDesc,
+		//GetStandardIntermediateScreenSpaceDesc(EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4, EFBOTargetBeforeResizeModifier_NONE, "downscale4x4.frag"),
+		//GetStandardIntermediateScreenSpaceDesc(EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4, EFBOTargetBeforeResizeModifier_NONE, "downscale4x4.frag"),
+		//GetStandardIntermediateScreenSpaceDesc(EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4, EFBOTargetBeforeResizeModifier_NONE, "downscale4x4.frag"),
+		//GetStandardIntermediateScreenSpaceDesc(EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_2x2, EFBOTargetBeforeResizeModifier_NONE, "downscale2x2.frag")
 		//FakeTonemap_ScreenPassDesc,
 		//KeepRedOnly_ScreenPassDesc
 	}

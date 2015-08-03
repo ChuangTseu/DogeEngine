@@ -210,7 +210,8 @@ void RenderGraph::BlitLastFBOToMainDefaultIfAny() const
 	pass.m_pipelineState.BindPipelineState();
 	pass.m_shader.use();
 
-	BindTextureAndSamplerToSlot(m_renderPasses.back().m_glColorTexIds[0], G_RENDERER2.GetDefaultDiffuseSamplerId(), 0);
+	//BindTextureAndSamplerToSlot(m_renderPasses.back().m_glColorTexIds[0], G_RENDERER2.GetDefaultDiffuseSamplerId(), 0);
+	BindTextureAndSamplerToSlot(m_renderPasses.back().m_glColorTexIds[0], G_RENDERER2.GetDefaultPointSamplerId(), 0);
 
 	GL(glGenerateMipmap(GL_TEXTURE_2D));
 

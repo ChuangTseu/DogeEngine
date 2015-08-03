@@ -1,0 +1,56 @@
+Exemple :
+
+	Le FORWARD avec :
+
+		- Côté Eye : ZPrepass, HDAO Pass, ForwardPass, TonemapPass
+
+		- Côté ShadowCasters (lights, etc...) : ZPrepass, HDAO Pass, ForwardPass, TonemapPass
+
+
+		Pour chaque ShadowCaster :
+
+			- Rendre la ShadowMap dédiée // INPUT : (Visible & ShadowCasting) 3D Scene  // OUTPUT : Depth
+
+
+		Pour chaque Eye :
+
+			[ZPrepass]
+			- Rendre la Depth via la ZPrepass // INPUT : (Visible) 3D Scene  // OUTPUT : Depth
+
+			[HDAO]
+			- Rendre les Normals // INPUT : (Visible) 3D Scene  // OUTPUT : Normals
+				Note : Mutualiser avec la ZPrepass si ZPrepass
+
+			- Rendre l'AO Buffer // INPUT : Depth, Normals  // OUTPUT : AO
+
+			[Forward Lighting]
+			- Pour chaque Light :
+				- Rendre l'éclairage // INPUT : (Visible) 3D Scene, Material&Light Params, Light' ShadowMap, AO  // OUTPUT : Photo HDR
+					Notes : Réutiliser la Depth en cours (générée via ZPrepass)
+
+			[ToneMap]
+			- ToneMapper le rendu HDR // INPUT : Photo HDR  // OUTPUT : Photo LDR
+
+
+Global Notes :
+	(Visible) ==> Visible par le (ou les, si multi via GS) point(s) de vue actuel(s)
+	(ShadowCasting) ==> L'object projette un shadow quand soumit à un émetteur de shadow
+
+
+	ZPREPASS !!! As a first examples, it shows that it's still good to have some level of control on the mesh/material side : for example, one mesh might need a different VS given its input layout (not that likely but still), but also it might require a specific CULL_MODE and CULL_ORIENTATION (really more likely, for debug purposes maybe)
+
+	SOLUTION = Mesh/(material ?) exposes its CULL_MODE and CULL_ORIENTATION parameters, and has authority on setting those two
+
+Roles :
+
+	* ShadowCaster
+
+		+ Possede :
+			- ShadowMap
+			- ViewPoint
+
+
+Data-driven :
+	
+	* la ZPrepass -> BlendState, RasterState, DepthState, Shader
+	* la NormalPass -> IDEM
