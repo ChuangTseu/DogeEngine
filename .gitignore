@@ -1,5 +1,18 @@
 VSbuild
+WinEnv
+
+QtGui
+SDL2Gui
+
+
+CmakeCache.txt
+
 CMakeLists.txt.user
+
+*.sh
+
+*.m
+*.mexw64
 
 *.lnk
 *.dll
@@ -18,3 +31,4 @@ build
 *.dae
 *.hdr
 *.asv
+

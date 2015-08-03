@@ -2,19 +2,19 @@
 
 #include "Renderer2.h"
 
-void RenderPass::operator=(RenderPass&& other)
-{
-	swap(other);
-}
+//void RenderPass::operator=(RenderPass&& other)
+//{
+//	swap(other);
+//}
+//
+//RenderPass::RenderPass(RenderPass&& other)
+//{
+//	swap(other);
+//}
 
-RenderPass::RenderPass(RenderPass&& other)
+RenderPass::RenderPass(const RenderPassDesc& desc, Dim2D FBODim)
 {
-	swap(other);
-}
-
-RenderPass::RenderPass(const RenderPassDesc& desc)
-{
-	LoadFromDesc(desc);
+	LoadFromDesc(desc, FBODim);
 }
 
 RenderPass::RenderPass()
@@ -22,24 +22,21 @@ RenderPass::RenderPass()
 
 }
 
-void RenderPass::swap(RenderPass& other)
-{
-	using std::swap;
-
-	swap(m_pipelineState, other.m_pipelineState);
-	swap(m_shader, other.m_shader);
-	swap(m_inputType, other.m_inputType);
-	swap(m_inputVisibility, other.m_inputVisibility);
-	swap(m_bIsLightingPass, other.m_bIsLightingPass);
-
-	swap(m_texOutputsInfo, other.m_texOutputsInfo);
-	swap(m_glFboId, other.m_glFboId);
-	swap(m_numFBOAttachements, other.m_numFBOAttachements);
-	swap(m_glColorTexIds, other.m_glColorTexIds);
-	swap(m_glDepthStencilTexId, other.m_glDepthStencilTexId);
-	swap(m_texOutputsInfo, other.m_texOutputsInfo);
-	swap(m_texOutputsInfo, other.m_texOutputsInfo);
-}
+//void RenderPass::swap(RenderPass& other)
+//{
+//	using std::swap;
+//
+//	swap(m_pipelineState, other.m_pipelineState);
+//	swap(m_shader, other.m_shader);
+//	swap(m_inputType, other.m_inputType);
+//	swap(m_inputVisibility, other.m_inputVisibility);
+//	swap(m_bIsLightingPass, other.m_bIsLightingPass);
+//
+//	swap(m_glFboId, other.m_glFboId);
+//	swap(m_numFBOAttachements, other.m_numFBOAttachements);
+//	swap(m_glColorTexIds, other.m_glColorTexIds);
+//	swap(m_glDepthStencilTexId, other.m_glDepthStencilTexId);
+//}
 
 bool ValidateDesc_FBO(const RenderPassFBODesc& fboDesc)
 {
@@ -205,18 +202,20 @@ bool ValidateDescs_TexOutsAgainstTexIns(const std::vector<RenderPassTextureOutpu
 	return true;
 }
 
-void RenderPass::LoadFromDesc(const RenderPassDesc& desc)
+void RenderPass::LoadFromDesc(const RenderPassDesc& desc, Dim2D FBODim)
 {
-	DogeAssert(ValidateDesc_FBO(desc.FBODesc));
-	DogeAssert(ValidateDesc_TexOuts(desc.texOutputsDesc));
-	DogeAssert(ValidateDesc_TexIns(desc.texInputsDesc));
-	DogeAssert(ValidateDescs_FBOAgainstTexOuts(desc.FBODesc, desc.texOutputsDesc));
+	m_FBODim = FBODim;
 
-	SetupFBOFromDesc(desc.FBODesc);
+	SetupFBOFromDesc(desc.FBODesc, m_FBODim);
 
-	for (const auto& texOutDesc : desc.texOutputsDesc)
+	//for (const auto& texOutDesc : desc.texOutputsDesc)
+	//{
+	//	m_texOutputsInfo.emplace_back(FBOAttachmentToSlot{ texOutDesc.attachmentFrom, texOutDesc.slotTo });
+	//}
+
+	for (const auto& texInDesc : desc.texInputsDesc)
 	{
-		m_texOutputsInfo.emplace_back(FBOAttachmentToSlot{ texOutDesc.attachmentFrom, texOutDesc.slotTo });
+		m_texInputsInfo.emplace_back(ColorTargetInputInfo{ texInDesc.semantic, texInDesc.slotIn });
 	}
 
 	m_shader.LoadFromDesc(desc.shaderDesc);
@@ -232,7 +231,25 @@ void RenderPass::LoadFromDesc(const RenderPassDesc& desc)
 	m_renderPassDesc = desc;
 }
 
-void RenderPass::Resize(int width, int height)
+void RenderPass::ContributeToRenderGraphDependentPassDesc(RenderGraphDependentPassDesc& desc)
+{
+	desc.previousPassDimensions = Dim2D{ (int)m_glColorTexDimensions[0].x, (int)m_glColorTexDimensions[0].y };
+
+	desc.allPreviousSemanticColorTargets;
+
+	for (size_t i = 0; i < m_renderPassDesc.FBODesc.FBOColorEntries.size(); ++i)
+	{
+		const FBOColorEntryDesc& colorEntryDesc = m_renderPassDesc.FBODesc.FBOColorEntries[i];
+
+		SemanticColorTargetDesc ctDesc;
+		ctDesc.semantic = colorEntryDesc.semantic;
+		ctDesc.slot = i;
+		ctDesc.passIndexFrom = /*index of this pass*/0;
+		desc.allPreviousSemanticColorTargets.push_back(ctDesc);
+	}
+}
+
+void RenderPass::Resize(Dim2D FBODim)
 {
 	glDeleteFramebuffers(1, &m_glFboId);
 	glDeleteTextures(1, &m_glDepthStencilTexId);
@@ -241,49 +258,150 @@ void RenderPass::Resize(int width, int height)
 	m_glColorTexIds.clear();
 	m_glColorTexDimensions.clear();
 
-	SetupFBOFromDesc(m_renderPassDesc.FBODesc);
+	m_FBODim = FBODim;
+	SetupFBOFromDesc(m_renderPassDesc.FBODesc, m_FBODim);
 }
 
-//
-// Note : a bit hacky, but any standard downscaling (screen 2x2,4x4,8x8) will base itself upon the screen dim rounded to the next multiple of 8
-// This allows for perfect size matching between consecutive standard downscaled sizes
-// AGAIN, this feels very hacky and might benefit from more thinking about the problem at hand
-Dim2D GetDimFromFBOSizeHeuristic(FBOSizeHeuristic sizeHeuristic)
+Dim2D ComputeSizeFromHeuristic(FBOSizeHeuristic sizeHeuristic, const Dim2D* maybePreviousDim)
 {
 	Dim2D dim;
 
-	if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_SCREEN_SIZE)
+	if (sizeHeuristic.eSizeMode >= EFBOTargetSizeMode_USE_SCREEN_SIZE && sizeHeuristic.eSizeMode <= EFBOTargetSizeMode_USE_SCREEN_DOWNSCALED_CUSTOM)
 	{
 		dim = G_RENDERER2.GetDim();
 	}
-	else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_SCREEN_DOWNSCALED_2x2)
+	else if (sizeHeuristic.eSizeMode >= EFBOTargetSizeMode_USE_PREVIOUS_SIZE && sizeHeuristic.eSizeMode <= EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_CUSTOM)
 	{
-		dim.width = NextMultiple8(G_RENDERER2.GetWidth()) / 2;
-		dim.height = NextMultiple8(G_RENDERER2.GetHeight()) / 2;
-	}
-	else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_SCREEN_DOWNSCALED_4x4)
-	{
-		dim.width = NextMultiple8(G_RENDERER2.GetWidth()) / 4;
-		dim.height = NextMultiple8(G_RENDERER2.GetHeight()) / 4;
-	}
-	else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_SCREEN_DOWNSCALED_8x8)
-	{
-		dim.width = NextMultiple8(G_RENDERER2.GetWidth()) / 8;
-		dim.height = NextMultiple8(G_RENDERER2.GetHeight()) / 8;
+		DogeAssert(maybePreviousDim);
+		dim = *maybePreviousDim;
 	}
 	else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_CUSTOM_SIZE)
 	{
 		dim = sizeHeuristic.customDim;
 	}
-	else
+
+	if (SizeModeImpliesDownscale(sizeHeuristic.eSizeMode))
 	{
-		DogeAssertAlways(); // Todo support other modes, implies refacto
+		if (sizeHeuristic.eBeforeResizeModifier != EFBOTargetBeforeResizeModifier_NONE)
+		{
+			if (sizeHeuristic.eBeforeResizeModifier == EFBOTargetBeforeResizeModifier_ROUND_NEXT_W2_H2)
+			{
+				dim.width = NextMultiple2(dim.width);
+				dim.height = NextMultiple2(dim.height);
+			}
+			else if (sizeHeuristic.eBeforeResizeModifier == EFBOTargetBeforeResizeModifier_ROUND_NEXT_W4_H4)
+			{
+				dim.width = NextMultiple4(dim.width);
+				dim.height = NextMultiple4(dim.height);
+			}
+			else if (sizeHeuristic.eBeforeResizeModifier == EFBOTargetBeforeResizeModifier_ROUND_NEXT_W8_H8)
+			{
+				dim.width = NextMultiple8(dim.width);
+				dim.height = NextMultiple8(dim.height);
+			}
+			else if (sizeHeuristic.eBeforeResizeModifier == EFBOTargetBeforeResizeModifier_ROUND_NEXT_CUSTOM)
+			{
+				dim.width = NextMultipleM(dim.width, sizeHeuristic.customMultiples.width);
+				dim.height = NextMultipleM(dim.height, sizeHeuristic.customMultiples.height);
+			}
+		}
+
+		if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_2x2)
+		{
+			dim.width = dim.width / 2;
+			dim.height = dim.height / 2;
+		}
+		else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4)
+		{
+			dim.width = dim.width / 4;
+			dim.height = dim.height / 4;
+		}
+		else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_8x8)
+		{
+			dim.width = dim.width / 8;
+			dim.height = dim.height / 8;
+		}
+		else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_CUSTOM)
+		{
+			dim.width = dim.width / sizeHeuristic.customDownscale.width;
+			dim.height = dim.height / sizeHeuristic.customDownscale.height;
+		}
 	}
 
 	return dim;
 }
 
-void RenderPass::SetupFBOFromDesc(const RenderPassFBODesc& desc)
+
+////
+//// Note : a bit hacky, but any standard downscaling (screen 2x2,4x4,8x8) will base itself upon the screen dim rounded to the next multiple of 8
+//// This allows for perfect size matching between consecutive standard downscaled sizes
+//// AGAIN, this feels very hacky and might benefit from more thinking about the problem at hand
+//Dim2D GetDimFromFBOSizeHeuristic(FBOSizeHeuristic sizeHeuristic, const Dim2D* maybePreviousDim)
+//{
+//	Dim2D dim;
+//
+//	if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_SCREEN_SIZE)
+//	{
+//		dim = G_RENDERER2.GetDim();
+//	}
+//	else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_SCREEN_DOWNSCALED_2x2)
+//	{
+//		dim.width = NextMultiple8(G_RENDERER2.GetWidth()) / 2;
+//		dim.height = NextMultiple8(G_RENDERER2.GetHeight()) / 2;
+//	}
+//	else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_SCREEN_DOWNSCALED_4x4)
+//	{
+//		dim.width = NextMultiple8(G_RENDERER2.GetWidth()) / 4;
+//		dim.height = NextMultiple8(G_RENDERER2.GetHeight()) / 4;
+//	}
+//	else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_SCREEN_DOWNSCALED_8x8)
+//	{
+//		dim.width = NextMultiple8(G_RENDERER2.GetWidth()) / 8;
+//		dim.height = NextMultiple8(G_RENDERER2.GetHeight()) / 8;
+//	}
+//	else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_SCREEN_DOWNSCALED_CUSTOM)
+//	{
+//		DogeAssertAlways();
+//	}
+//	else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_CUSTOM_SIZE)
+//	{
+//		dim = sizeHeuristic.customDim;
+//	}
+//	else
+//	{
+//		DogeAssert(maybePreviousDim); // Todo support other modes, implies refacto
+//
+//		const Dim2D& previousDim = *maybePreviousDim;
+//
+//		if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_PREVIOUS_SIZE)
+//		{
+//			dim = previousDim;
+//		}
+//		else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_2x2)
+//		{
+//			dim.width = NextMultiple8(previousDim.width) / 2;
+//			dim.height = NextMultiple8(previousDim.height) / 2;
+//		}
+//		else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4)
+//		{
+//			dim.width = NextMultiple8(previousDim.width) / 4;
+//			dim.height = NextMultiple8(previousDim.height) / 4;
+//		}
+//		else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_8x8)
+//		{
+//			dim.width = NextMultiple8(previousDim.width) / 8;
+//			dim.height = NextMultiple8(previousDim.height) / 8;
+//		}
+//		else if (sizeHeuristic.eSizeMode == EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_CUSTOM)
+//		{
+//			DogeAssertAlways();
+//		}
+//	}
+//
+//	return dim;
+//}
+
+void RenderPass::SetupFBOFromDesc(const RenderPassFBODesc& desc, Dim2D FBODim)
 {
 	GL(glGenFramebuffers(1, &m_glFboId));
 	GL(glBindFramebuffer(GL_FRAMEBUFFER, m_glFboId));
@@ -307,11 +425,9 @@ void RenderPass::SetupFBOFromDesc(const RenderPassFBODesc& desc)
 
 			GL(glBindTexture(GL_TEXTURE_2D, glColorTexId));
 
-			Dim2D dim = GetDimFromFBOSizeHeuristic(colorEntryDesc.sizeHeuristic);
+			m_glColorTexDimensions.emplace_back(vec4{ (float)FBODim.width, (float)FBODim.height, 1.f / FBODim.width, 1.f / FBODim.height });
 
-			m_glColorTexDimensions.emplace_back(vec4{ (float)dim.width, (float)dim.height, 1.f / dim.width, 1.f / dim.height });
-
-			GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, dim.width, dim.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0));
+			GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, FBODim.width, FBODim.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0));
 			GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
 			GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
 
@@ -333,9 +449,7 @@ void RenderPass::SetupFBOFromDesc(const RenderPassFBODesc& desc)
 
 		GL(glBindTexture(GL_TEXTURE_2D, m_glDepthStencilTexId));
 
-		Dim2D dim = GetDimFromFBOSizeHeuristic(depthStencilEntryDesc.sizeHeuristic);
-
-		GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, dim.width, dim.height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0));
+		GL(glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, FBODim.width, FBODim.height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0));
 
 		GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0));
 		GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0));
@@ -417,8 +531,13 @@ void RenderPass::PostRender() const
 	Shader::unbind();
 	UnbindFBO();
 
-	for (const FBOAttachmentToSlot& texOutInfo : m_texOutputsInfo)
-	{
-		BindTextureAndSamplerToSlot(m_glColorTexIds[texOutInfo.attachmentFrom], G_RENDERER2.GetDefaultPointSamplerId(), texOutInfo.slotTo);
-	}
+	//for (const FBOAttachmentToSlot& texOutInfo : m_texOutputsInfo)
+	//{
+	//	BindTextureAndSamplerToSlot(m_glColorTexIds[texOutInfo.attachmentFrom], G_RENDERER2.GetDefaultPointSamplerId(), texOutInfo.slotTo);
+	//}
+}
+
+const std::vector<ColorTargetInputInfo>& RenderPass::GetColorTargetInputInfos() const
+{
+	return m_texInputsInfo;
 }

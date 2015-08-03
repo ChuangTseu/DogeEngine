@@ -35,10 +35,19 @@ static PipelineState GetZPrepass_PipelineState()
 }
 
 static RenderPassDesc ZPRepass_3DPassDesc{
-	{}, {}, 
-	RenderPassFBODesc{ true, true, 
+	{}, 
+	RenderPassFBODesc{ 
+		true, 
+		true, 
+		{ 
+			EFBOTargetSizeMode_USE_SCREEN_SIZE, 
+			{}, 
+			{},
+			EFBOTargetBeforeResizeModifier_NONE,
+			{}
+		},
 		std::vector<FBOColorEntryDesc>{}, 
-		FBODepthStencilEntryDesc{ -666, { EFBOTargetSizeMode_USE_SCREEN_SIZE, {} }, EFBOTargetClearMode_CLEAR_BEFORE_USE, 1.f }
+		FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_CLEAR_BEFORE_USE, 1.f }
 	},
 	// Shader
 	{
@@ -48,15 +57,15 @@ static RenderPassDesc ZPRepass_3DPassDesc{
 		{ "simple3D.vert", "", "", "", "" }
 	},
 
-		// Pipeline state
-		GetZPrepass_PipelineState(),
+	// Pipeline state
+	GetZPrepass_PipelineState(),
 
-		// Input type and its visibility if any
-		EPassInputType_3DScene,
-		EVisibility_Any,
+	// Input type and its visibility if any
+	EPassInputType_3DScene,
+	EVisibility_Any,
 
-		// Is lighting
-		false
+	// Is lighting
+	false
 };
 
 static PipelineState GetSimple3D_PipelineState()
@@ -89,15 +98,19 @@ static PipelineState GetSimple3D_PipelineState()
 
 static RenderPassDesc Simple3D_3DPassDesc{
 	{}, 
-	std::vector<RenderPassTextureOutputDesc>{
-		{0, 0, "SceneRender", -666}
-	},
 	RenderPassFBODesc{ 
 		false, true, 
+		{
+			EFBOTargetSizeMode_USE_SCREEN_SIZE,
+			{},
+			{},
+			EFBOTargetBeforeResizeModifier_NONE,
+			{}
+		},
 		std::vector<FBOColorEntryDesc>{ 
-			{ "SceneRender", -666, { EFBOTargetSizeMode_USE_SCREEN_SIZE, {} }, EFBOTargetClearMode_CLEAR_BEFORE_USE, { 0.f, 1.f, 1.f, 0.f } }
+			{ "SceneRender", -666, EFBOTargetClearMode_CLEAR_BEFORE_USE, { 0.f, 1.f, 1.f, 0.f } }
 		}, 
-			FBODepthStencilEntryDesc{ -666, {EFBOTargetSizeMode_USE_SCREEN_SIZE, {} }, EFBOTargetClearMode_NO_CLEAR, {} }
+			FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
 	},
 	// Shader
 	{
@@ -146,15 +159,19 @@ static RenderPassDesc Downscale2x2_ScreenPassDesc{
 	std::vector<RenderPassTextureInputDesc>{
 		{0, "SceneRender", -666}
 	},
-		std::vector<RenderPassTextureOutputDesc>{
-			{0, 0, "SceneRenderDownscaled2x2", -666}
-	},
 		RenderPassFBODesc{
 		false, true,
-		std::vector<FBOColorEntryDesc>{
-			{ "SceneRenderDownscaled2x2", -666, { EFBOTargetSizeMode_USE_SCREEN_DOWNSCALED_2x2, {} }, EFBOTargetClearMode_NO_CLEAR, {} }
+		{
+			EFBOTargetSizeMode_USE_SCREEN_SIZE,
+			{},
+			{},
+			EFBOTargetBeforeResizeModifier_NONE,
+			{}
 		},
-			FBODepthStencilEntryDesc{ -666, { {}, {} }, EFBOTargetClearMode_NO_CLEAR, {} }
+		std::vector<FBOColorEntryDesc>{
+			{ "SceneRenderDownscaled2x2", -666, EFBOTargetClearMode_NO_CLEAR, {} }
+		},
+			FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
 	},
 	// Shader
 	{
@@ -177,17 +194,21 @@ static RenderPassDesc Downscale2x2_ScreenPassDesc{
 
 static RenderPassDesc Downscale4x4_ScreenPassDesc{
 	std::vector<RenderPassTextureInputDesc>{
-		{0, "SceneRender", -666}
-	},
-		std::vector<RenderPassTextureOutputDesc>{
-			{0, 0, "SceneRenderDownscaled4x4", -666}
+		{0, "", -666}
 	},
 		RenderPassFBODesc{
 		false, true,
-		std::vector<FBOColorEntryDesc>{
-			{ "SceneRenderDownscaled4x4", -666, { EFBOTargetSizeMode_USE_SCREEN_DOWNSCALED_4x4, {} }, EFBOTargetClearMode_NO_CLEAR, {} }
+		{
+			EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4,
+			{},
+			{},
+			EFBOTargetBeforeResizeModifier_ROUND_NEXT_W8_H8,
+			{}
 		},
-			FBODepthStencilEntryDesc{ -666, { {}, {} }, EFBOTargetClearMode_NO_CLEAR, {} }
+		std::vector<FBOColorEntryDesc>{
+			{ "SceneRenderDownscaled4x4", -666, EFBOTargetClearMode_NO_CLEAR, {} }
+		},
+			FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
 	},
 	// Shader
 	{
@@ -213,15 +234,19 @@ static RenderPassDesc FakeTonemap_ScreenPassDesc{
 	std::vector<RenderPassTextureInputDesc>{
 		{0, "SceneRender", -666}
 	},
-	std::vector<RenderPassTextureOutputDesc>{
-		{0, 0, "ScreenTonemapped", -666}
-	},
 	RenderPassFBODesc{
 		false, true,
-		std::vector<FBOColorEntryDesc>{
-			{ "ScreenTonemapped", -666, { EFBOTargetSizeMode_USE_SCREEN_SIZE, {} }, EFBOTargetClearMode_NO_CLEAR, {} }
+		{
+			EFBOTargetSizeMode_USE_SCREEN_SIZE,
+			{},
+			{},
+			EFBOTargetBeforeResizeModifier_NONE,
+			{}
 		},
-			FBODepthStencilEntryDesc{ -666, { {}, {} }, EFBOTargetClearMode_NO_CLEAR, {} }
+		std::vector<FBOColorEntryDesc>{
+			{ "ScreenTonemapped", -666, EFBOTargetClearMode_NO_CLEAR, {} }
+		},
+			FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
 	},
 	// Shader
 	{
@@ -246,15 +271,19 @@ static RenderPassDesc KeepRedOnly_ScreenPassDesc{
 	std::vector<RenderPassTextureInputDesc>{
 		{0, "ScreenTonemapped", -666}
 	},
-		std::vector<RenderPassTextureOutputDesc>{
-			{0, 0, "ScreenRedOnly", -666}
-	},
 		RenderPassFBODesc{
 		false, true,
-		std::vector<FBOColorEntryDesc>{
-			{ "ScreenRedOnly", -666, { EFBOTargetSizeMode_USE_SCREEN_SIZE, {} }, EFBOTargetClearMode_NO_CLEAR, {} }
+		{
+			EFBOTargetSizeMode_USE_SCREEN_SIZE,
+			{},
+			{},
+			EFBOTargetBeforeResizeModifier_NONE,
+			{}
 		},
-			FBODepthStencilEntryDesc{ -666, { {}, {} }, EFBOTargetClearMode_NO_CLEAR, {} }
+		std::vector<FBOColorEntryDesc>{
+			{ "ScreenRedOnly", -666, EFBOTargetClearMode_NO_CLEAR, {} }
+		},
+			FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
 	},
 	// Shader
 	{
@@ -281,7 +310,8 @@ static RenderGraphDesc defaultRenderGraph_ScenePhotoDesc{
 		ZPRepass_3DPassDesc,
 		Simple3D_3DPassDesc,
 		//Downscale2x2_ScreenPassDesc,
-		Downscale4x4_ScreenPassDesc
+		Downscale4x4_ScreenPassDesc,
+		Downscale4x4_ScreenPassDesc,
 		//FakeTonemap_ScreenPassDesc,
 		//KeepRedOnly_ScreenPassDesc
 	}
@@ -481,9 +511,11 @@ void Renderer2::RenderPassWithInput(const RenderPass& renderPass) const
 
 void Renderer2::DeployRenderGraph(const RenderGraph& renderGraph) const
 {
-	for (const RenderPass& renderPass : renderGraph.GetAllPasses())
+	for (auto nPass = 0; nPass < renderGraph.GetPassCount(); ++nPass)
 	{
-		renderPass.PreRender();
+		renderGraph.BeginPass(nPass);
+
+		const RenderPass& renderPass = renderGraph.GetPass(nPass);
 
 		if (renderPass.IsLightingPass())
 		{
@@ -499,8 +531,29 @@ void Renderer2::DeployRenderGraph(const RenderGraph& renderGraph) const
 			RenderPassWithInput(renderPass);
 		}
 
-		renderPass.PostRender();
+		renderGraph.EndPass(nPass);
 	}
+
+	//for (const RenderPass& renderPass : renderGraph.GetAllPasses())
+	//{
+	//	renderPass.PreRender();
+
+	//	if (renderPass.IsLightingPass())
+	//	{
+	//		for (const Light* pLight : m_lights)
+	//		{
+	//			pLight->UpdateRenderConstants();
+
+	//			RenderPassWithInput(renderPass);
+	//		}
+	//	}
+	//	else
+	//	{
+	//		RenderPassWithInput(renderPass);
+	//	}
+
+	//	renderPass.PostRender();
+	//}
 }
 
 void Renderer2::CleanUp()
