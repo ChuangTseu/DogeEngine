@@ -96,7 +96,7 @@ void main( void )
 	testDirLight.direction = L;
 	testDirLight.color = vec3(1,0,1);
 
-    finalColor += blinn_phong_calc(testDirLight, N);
+    //finalColor += blinn_phong_calc(testDirLight, N);
 
     for (int nDirLight = 0; nDirLight < g_numDirLights; ++nDirLight)
     {

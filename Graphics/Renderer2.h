@@ -11,6 +11,7 @@
 #include "Light.h"
 #include "Shader.h"
 #include "Mesh.h"
+#include "Model.h"
 #include "PipelineState.h"
 #include "Camera.h"
 
@@ -129,7 +130,19 @@ public:
 
 	void InitializeGLDependentData();
 
+	struct DemoData
+	{
+		ViewPoint cameraViewPoint;
+
+		Model testModel;
+
+		DirLight testDirLight;
+		DirLight testDirLight2;
+		DirLight testDirLight3;
+	} m_demoData;
+
 	void InitializeDemoData();
+	void UpdateDemoData();
 
 	void initializeGL();
 

@@ -186,7 +186,7 @@ static RenderPassDesc BlitFBO_ScreenPassDesc{
 	EVisibility_Any,
 
 	// Is lighting
-	false
+	ELightingMode_NO_LIGHTING
 };
 
 static const RenderPass& GetDefaultPass_BlitFBO()

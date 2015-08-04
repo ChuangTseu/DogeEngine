@@ -132,6 +132,12 @@ struct RenderPassFBODesc
 	FBODepthStencilEntryDesc FBODepthStencilEntry;
 };
 
+enum ELightingMode {
+	ELightingMode_NO_LIGHTING,
+	ELightingMode_LIGHTING_LOOP_IN_SHADER,
+	ELightingMode_LIGHTING_LOOP_CLIENT_SIDE
+};
+
 struct RenderPassDesc
 {
 	std::vector<RenderPassTextureInputDesc> texInputsDesc;
@@ -146,7 +152,7 @@ struct RenderPassDesc
 	EPassInputType inputType;
 	EVisibility inputVisibility; // Not used for ScreenPasses
 
-	bool bIsLightingPass;
+	ELightingMode eLightingMode;
 };
 
 struct SemanticColorTargetDesc
@@ -240,6 +246,7 @@ public:
 	EVisibility GetInputVisibility() const;
 
 	bool IsLightingPass() const;
+	ELightingMode GetLightingMode() const;
 
 	void PreRender() const;
 
@@ -267,6 +274,7 @@ public:
 	EVisibility m_inputVisibility; // Not used for ScreenPasses
 
 	bool m_bIsLightingPass;
+	ELightingMode m_lightingMode;
 
 	RenderPassDesc m_renderPassDesc;
 };

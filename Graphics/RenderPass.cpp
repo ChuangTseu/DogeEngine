@@ -225,8 +225,7 @@ void RenderPass::LoadFromDesc(const RenderPassDesc& desc, Dim2D FBODim)
 	m_inputType = desc.inputType;
 	m_inputVisibility = desc.inputVisibility;
 
-	m_bIsLightingPass = desc.bIsLightingPass;
-
+	m_lightingMode = desc.eLightingMode;
 
 	m_renderPassDesc = desc;
 }
@@ -516,7 +515,12 @@ EVisibility RenderPass::GetInputVisibility() const
 
 bool RenderPass::IsLightingPass() const
 {
-	return m_bIsLightingPass;
+	return m_lightingMode != ELightingMode_NO_LIGHTING;
+}
+
+ELightingMode RenderPass::GetLightingMode() const
+{
+	return m_lightingMode;
 }
 
 void RenderPass::PreRender() const

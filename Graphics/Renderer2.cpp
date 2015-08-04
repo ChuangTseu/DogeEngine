@@ -65,7 +65,7 @@ static RenderPassDesc ZPRepass_3DPassDesc{
 	EVisibility_Any,
 
 	// Is lighting
-	false
+	ELightingMode_NO_LIGHTING
 };
 
 static PipelineState GetSimple3D_PipelineState()
@@ -128,7 +128,7 @@ static RenderPassDesc Simple3D_3DPassDesc{
 		EVisibility_Any,
 
 		// Is lighting
-		true
+		ELightingMode_LIGHTING_LOOP_CLIENT_SIDE
 };
 
 static PipelineState GetScreenSpacePass_PipelineState()
@@ -200,7 +200,7 @@ static RenderPassDesc Downscale2x2_ScreenPassDesc{
 	EVisibility_Any,
 
 	// Is lighting
-	false
+	ELightingMode_NO_LIGHTING
 };
 
 static RenderPassDesc GetStandardIntermediateScreenSpaceDesc(
@@ -233,100 +233,25 @@ static RenderPassDesc GetStandardIntermediateScreenSpaceDesc(
 		/*pipelineState : */	GetScreenSpacePass_PipelineState(),
 		/*inputType : */		EPassInputType_ScreenQuadById,
 		/*inputVisibility : */	EVisibility_Any,
-		/*isLighting : */		false
+		/*isLighting : */		ELightingMode_NO_LIGHTING
 	};
 }
 
-static RenderPassDesc Downscale4x4_ScreenPassDesc{
-	/*inTextures : */		std::vector<RenderPassTextureInputDesc>{{0, "", -666}},
-	/*FBODesc : */			RenderPassFBODesc{ false, true, {
-			EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4,{},{},
-			EFBOTargetBeforeResizeModifier_ROUND_NEXT_W8_H8,{}
-		},
-		std::vector<FBOColorEntryDesc>{{ "", -666, EFBOTargetClearMode_NO_CLEAR, {} }},
-		FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
-	},
-	/*shaderDesc : */		GetScreenSpacePass_Downscale4x4_ShaderDesc(),
-	/*pipelineState : */	GetScreenSpacePass_PipelineState(),
-	/*inputType : */		EPassInputType_ScreenQuadById,
-	/*inputVisibility : */	EVisibility_Any,
-	/*isLighting : */		false
-};
-
-
-static RenderPassDesc FakeTonemap_ScreenPassDesc{
-	std::vector<RenderPassTextureInputDesc>{
-		{0, "SceneRender", -666}
-	},
-	RenderPassFBODesc{
-		false, true,
-		{
-			EFBOTargetSizeMode_USE_SCREEN_SIZE,
-			{},
-			{},
-			EFBOTargetBeforeResizeModifier_NONE,
-			{}
-		},
-		std::vector<FBOColorEntryDesc>{
-			{ "ScreenTonemapped", -666, EFBOTargetClearMode_NO_CLEAR, {} }
-		},
-			FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
-	},
-	// Shader
-	{
-		// Active stages
-		{ true, false, false, false, true },
-		// Stages filenames
-		{ "screenQuadById.vert", "", "", "", "fakeTonemap.frag" }
-	},
-
-	// Pipeline state
-	GetScreenSpacePass_PipelineState(),
-
-	// Input type and its visibility if any
-	EPassInputType_ScreenQuadById,
-	EVisibility_Any,
-
-	// Is lighting
-	false
-};
-
-static RenderPassDesc KeepRedOnly_ScreenPassDesc{
-	std::vector<RenderPassTextureInputDesc>{
-		{0, "ScreenTonemapped", -666}
-	},
-		RenderPassFBODesc{
-		false, true,
-		{
-			EFBOTargetSizeMode_USE_SCREEN_SIZE,
-			{},
-			{},
-			EFBOTargetBeforeResizeModifier_NONE,
-			{}
-		},
-		std::vector<FBOColorEntryDesc>{
-			{ "ScreenRedOnly", -666, EFBOTargetClearMode_NO_CLEAR, {} }
-		},
-			FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
-	},
-	// Shader
-	{
-		// Active stages
-		{ true, false, false, false, true },
-		// Stages filenames
-		{ "screenQuadById.vert", "", "", "", "keepRedOnly.frag" }
-	},
-
-	// Pipeline state
-	GetScreenSpacePass_PipelineState(),
-
-	// Input type and its visibility if any
-	EPassInputType_ScreenQuadById,
-	EVisibility_Any,
-
-	// Is lighting
-	false
-};
+//static RenderPassDesc Downscale4x4_ScreenPassDesc{
+//	/*inTextures : */		std::vector<RenderPassTextureInputDesc>{{0, "", -666}},
+//	/*FBODesc : */			RenderPassFBODesc{ false, true, {
+//			EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4,{},{},
+//			EFBOTargetBeforeResizeModifier_ROUND_NEXT_W8_H8,{}
+//		},
+//		std::vector<FBOColorEntryDesc>{{ "", -666, EFBOTargetClearMode_NO_CLEAR, {} }},
+//		FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
+//	},
+//	/*shaderDesc : */		GetScreenSpacePass_Downscale4x4_ShaderDesc(),
+//	/*pipelineState : */	GetScreenSpacePass_PipelineState(),
+//	/*inputType : */		EPassInputType_ScreenQuadById,
+//	/*inputVisibility : */	EVisibility_Any,
+//	/*isLighting : */		false
+//};
 
 static RenderGraphDesc defaultRenderGraph_ScenePhotoDesc{
 	// Passes vector
@@ -553,30 +478,42 @@ void Renderer2::DeployRenderGraph(const RenderGraph& renderGraph) const
 
 		if (renderPass.IsLightingPass())
 		{
-#if LIGHTS_LOOP_OUTSIDE_SHADER
-			for (const Light* pLight : m_lights)
+			if (renderPass.GetLightingMode() == ELightingMode_LIGHTING_LOOP_CLIENT_SIDE)
 			{
-				pLight->UpdateRenderConstants();
+				//DogeAssertAlways(); // TODO support (with blending & others)
+				int dirLightsCount = m_dirLights.size();
+
+				SystemCBuffersManager::GetMutableLightsCB().numDirLights = 1;
+
+				for (int nDirLight = 0; nDirLight < dirLightsCount; ++nDirLight)
+				{
+					const DirLight* pDirLight = m_dirLights[nDirLight];
+
+					SystemCBuffersManager::GetMutableLightsCB().dirLights[0].m_color = pDirLight->m_color;
+					SystemCBuffersManager::GetMutableLightsCB().dirLights[0].m_direction = pDirLight->m_direction;
+
+					SystemCBuffersManager::CommitLightsCB();
+					RenderPassWithInput(renderPass);
+				}
+			}			
+			else if (renderPass.GetLightingMode() == ELightingMode_LIGHTING_LOOP_IN_SHADER)
+			{
+				int dirLightsCount = m_dirLights.size();
+
+				SystemCBuffersManager::GetMutableLightsCB().numDirLights = dirLightsCount;
+
+				for (int nDirLight = 0; nDirLight < dirLightsCount; ++nDirLight)
+				{
+					const DirLight* pDirLight = m_dirLights[nDirLight];
+
+					SystemCBuffersManager::GetMutableLightsCB().dirLights[nDirLight].m_color = pDirLight->m_color;
+					SystemCBuffersManager::GetMutableLightsCB().dirLights[nDirLight].m_direction = pDirLight->m_direction;
+				}
+
+				SystemCBuffersManager::CommitLightsCB();
 
 				RenderPassWithInput(renderPass);
 			}
-#else // LIGHTS_LOOP_INSIDE_SHADER
-			int dirLightsCount = m_dirLights.size();
-
-			SystemCBuffersManager::GetMutableLightsCB().numDirLights = dirLightsCount;
-
-			for (int nDirLight = 0; nDirLight < dirLightsCount; ++nDirLight)
-			{
-				const DirLight* pDirLight = m_dirLights[nDirLight];
-
-				SystemCBuffersManager::GetMutableLightsCB().dirLights[nDirLight].m_color = pDirLight->m_color;
-				SystemCBuffersManager::GetMutableLightsCB().dirLights[nDirLight].m_direction = pDirLight->m_direction;
-			}
-
-			SystemCBuffersManager::CommitLightsCB();
-
-			RenderPassWithInput(renderPass);
-#endif
 		}
 		else
 		{
@@ -717,8 +654,6 @@ void Renderer2::InitializeGLDependentData()
 	GL(glSamplerParameteri(m_glAnisotropicSamplerId, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
 }
 
-#include "Model.h"
-
 void Renderer2::InitializeDemoData()
 {
 	m_rendererTimer.start();
@@ -726,25 +661,35 @@ void Renderer2::InitializeDemoData()
 	m_mainCamera.SetPositionProperties(vec3{ 0.f, 0.f, -5.f }, vec3{ 0.f, 0.f, 1.f }, vec3{ 0.f, 1.f, 0.f });
 	m_mainCamera.SetProjectionProperties(70.f, (float)m_width / (float)m_height, 0.1f, 1000.f);
 
-	static ViewPoint cameraViewPoint = m_mainCamera.ComputeViewPoint();
+	m_demoData.cameraViewPoint = m_mainCamera.ComputeViewPoint();
 
-	RegisterViewPoint(cameraViewPoint);
+	RegisterViewPoint(m_demoData.cameraViewPoint);
 
-	static Model testModel;
-	testModel.loadFromFile("cubenorm.obj");
+	m_demoData.testModel.loadFromFile("cubenorm.obj");
 
-	RegisterRenderableObject(testModel);
+	RegisterRenderableObject(m_demoData.testModel);
 
-	static DirLight testDirLight;
-	testDirLight.m_color = vec3{ 0.f, 1.f, 0.f };
-	testDirLight.m_direction = vec3{ 1.f, 0.f, 0.f };
+	m_demoData.testDirLight.m_color = vec3{ 0.f, 1.f, 0.f };
+	m_demoData.testDirLight.m_direction = vec3{ 1.f, 0.f, 0.f };
 
-	static DirLight testDirLight2;
-	testDirLight2.m_color = vec3{ 1.f, 0.f, 0.f };
-	testDirLight2.m_direction = vec3{ -1.f, 0.f, 0.f };
+	m_demoData.testDirLight2.m_color = vec3{ 1.f, 0.f, 0.f };
+	m_demoData.testDirLight2.m_direction = vec3{ -1.f, 0.f, 0.f };
 
-	RegisterDirLight(testDirLight);
-	RegisterDirLight(testDirLight2);
+	float time = static_cast<float>(m_rendererTimer.getElapsedTimeInSec());
+	m_demoData.testDirLight3.m_color = vec3{ 0.72549019607f, 0.94901960784f, 1.0f };
+	m_demoData.testDirLight3.m_direction = vec3{ cosf(time), 0, sinf(time) };
+
+	RegisterDirLight(m_demoData.testDirLight);
+	RegisterDirLight(m_demoData.testDirLight2);
+	RegisterDirLight(m_demoData.testDirLight3);
+}
+
+void Renderer2::UpdateDemoData()
+{
+	m_demoData.cameraViewPoint = m_mainCamera.ComputeViewPoint();
+
+	float time = static_cast<float>(m_rendererTimer.getElapsedTimeInSec());
+	m_demoData.testDirLight3.m_direction = vec3{ cosf(time), 0, sinf(time) };
 }
 
 void Renderer2::initializeGL()
@@ -802,10 +747,7 @@ void Renderer2::paintGL()
 
 	m_mainCamera.UpdateLookAt();
 
-	ViewPoint cameraViewPoint = m_mainCamera.ComputeViewPoint();
-
-	m_viewPoints.clear();
-	RegisterViewPoint(cameraViewPoint);
+	UpdateDemoData();
 
 	SystemCBuffersManager::GetMutablePerFrameCB().m_randRgbColor = GenRandomVec3();
 	SystemCBuffersManager::GetMutablePerFrameCB().m_time = static_cast<float>(m_rendererTimer.getElapsedTimeInSec());
