@@ -95,7 +95,13 @@ void main( void )
   	DirLight testDirLight;
 	testDirLight.direction = L;
 	testDirLight.color = vec3(1,0,1);
-    finalColor = blinn_phong_calc(testDirLight, N);
+
+    finalColor += blinn_phong_calc(testDirLight, N);
+
+    for (int nDirLight = 0; nDirLight < g_numDirLights; ++nDirLight)
+    {
+        finalColor += blinn_phong_calc(g_dirLights[nDirLight], N);
+    }
 
 //    fragColor.xyz += vec3(0.05); // FAKE AMBIANT
 

@@ -128,7 +128,7 @@ static RenderPassDesc Simple3D_3DPassDesc{
 		EVisibility_Any,
 
 		// Is lighting
-		false
+		true
 };
 
 static PipelineState GetScreenSpacePass_PipelineState()
@@ -334,7 +334,7 @@ static RenderGraphDesc defaultRenderGraph_ScenePhotoDesc{
 		ZPRepass_3DPassDesc,
 		Simple3D_3DPassDesc,
 		//Downscale2x2_ScreenPassDesc,
-		Downscale4x4_ScreenPassDesc,
+		//Downscale4x4_ScreenPassDesc,
 		//GetStandardIntermediateScreenSpaceDesc(EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4, EFBOTargetBeforeResizeModifier_NONE, "downscale4x4.frag"),
 		//GetStandardIntermediateScreenSpaceDesc(EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4, EFBOTargetBeforeResizeModifier_NONE, "downscale4x4.frag"),
 		//GetStandardIntermediateScreenSpaceDesc(EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4, EFBOTargetBeforeResizeModifier_NONE, "downscale4x4.frag"),
@@ -377,6 +377,11 @@ Renderer2* Renderer2::GetInstance()
 void Renderer2::RegisterLight(const Light& light)
 {
 	m_lights.push_back(&light);
+}
+
+void Renderer2::RegisterDirLight(const DirLight& dirLight)
+{
+	m_dirLights.push_back(&dirLight);
 }
 
 void Renderer2::RegisterShadowEmittingLight(const ShadowEmittingLight& light)
@@ -536,6 +541,8 @@ void Renderer2::RenderPassWithInput(const RenderPass& renderPass) const
 	}
 }
 
+#define LIGHTS_LOOP_OUTSIDE_SHADER 0
+
 void Renderer2::DeployRenderGraph(const RenderGraph& renderGraph) const
 {
 	for (auto nPass = 0; nPass < renderGraph.GetPassCount(); ++nPass)
@@ -546,12 +553,30 @@ void Renderer2::DeployRenderGraph(const RenderGraph& renderGraph) const
 
 		if (renderPass.IsLightingPass())
 		{
+#if LIGHTS_LOOP_OUTSIDE_SHADER
 			for (const Light* pLight : m_lights)
 			{
 				pLight->UpdateRenderConstants();
 
 				RenderPassWithInput(renderPass);
 			}
+#else // LIGHTS_LOOP_INSIDE_SHADER
+			int dirLightsCount = m_dirLights.size();
+
+			SystemCBuffersManager::GetMutableLightsCB().numDirLights = dirLightsCount;
+
+			for (int nDirLight = 0; nDirLight < dirLightsCount; ++nDirLight)
+			{
+				const DirLight* pDirLight = m_dirLights[nDirLight];
+
+				SystemCBuffersManager::GetMutableLightsCB().dirLights[nDirLight].m_color = pDirLight->m_color;
+				SystemCBuffersManager::GetMutableLightsCB().dirLights[nDirLight].m_direction = pDirLight->m_direction;
+			}
+
+			SystemCBuffersManager::CommitLightsCB();
+
+			RenderPassWithInput(renderPass);
+#endif
 		}
 		else
 		{
@@ -560,27 +585,6 @@ void Renderer2::DeployRenderGraph(const RenderGraph& renderGraph) const
 
 		renderGraph.EndPass(nPass);
 	}
-
-	//for (const RenderPass& renderPass : renderGraph.GetAllPasses())
-	//{
-	//	renderPass.PreRender();
-
-	//	if (renderPass.IsLightingPass())
-	//	{
-	//		for (const Light* pLight : m_lights)
-	//		{
-	//			pLight->UpdateRenderConstants();
-
-	//			RenderPassWithInput(renderPass);
-	//		}
-	//	}
-	//	else
-	//	{
-	//		RenderPassWithInput(renderPass);
-	//	}
-
-	//	renderPass.PostRender();
-	//}
 }
 
 void Renderer2::CleanUp()
@@ -730,6 +734,17 @@ void Renderer2::InitializeDemoData()
 	testModel.loadFromFile("cubenorm.obj");
 
 	RegisterRenderableObject(testModel);
+
+	static DirLight testDirLight;
+	testDirLight.m_color = vec3{ 0.f, 1.f, 0.f };
+	testDirLight.m_direction = vec3{ 1.f, 0.f, 0.f };
+
+	static DirLight testDirLight2;
+	testDirLight2.m_color = vec3{ 1.f, 0.f, 0.f };
+	testDirLight2.m_direction = vec3{ -1.f, 0.f, 0.f };
+
+	RegisterDirLight(testDirLight);
+	RegisterDirLight(testDirLight2);
 }
 
 void Renderer2::initializeGL()

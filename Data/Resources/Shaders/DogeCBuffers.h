@@ -45,6 +45,13 @@ layout( std140, binding = 5 ) uniform PerFboCB {
    	vec4 g_FboDimensions[16]; // x : Width, y : Height, z : 1 / Width, w : 1 / Height
 };
 
+#define MAX_SHADER_LIGHTS 16
+
+layout( std140, binding = 6 ) uniform LightsCB {
+   	DirLight g_dirLights[MAX_SHADER_LIGHTS];
+   	int g_numDirLights;
+};
+
 layout( std140, binding = 8 ) uniform UIConfigCB {
 	int currentBRDF;
 

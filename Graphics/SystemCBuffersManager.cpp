@@ -26,6 +26,8 @@ PerMaterialCB SystemCBuffersManager::m_perMaterialCb;
 GLuint SystemCBuffersManager::m_perMaterialCbId;
 PerFboCB SystemCBuffersManager::m_perFboCb;
 GLuint SystemCBuffersManager::m_perFboCbId;
+LightsCB SystemCBuffersManager::m_lightsCb;
+GLuint SystemCBuffersManager::m_lightsCbId;
 UIConfigCB SystemCBuffersManager::m_UIConfigCb;
 GLuint SystemCBuffersManager::m_UIConfigCbId;
 
@@ -37,6 +39,7 @@ void SystemCBuffersManager::Initialize()
 	CreateAndBindSystemCBuffer(m_perLightCbId, 3);
 	CreateAndBindSystemCBuffer(m_perMaterialCbId, 4);
 	CreateAndBindSystemCBuffer(m_perFboCbId, 5);
+	CreateAndBindSystemCBuffer(m_lightsCbId, 6);
 
 	CreateAndBindSystemCBuffer(m_UIConfigCbId, 8);
 }
@@ -69,6 +72,11 @@ void SystemCBuffersManager::CommitPerMaterialCB()
 void SystemCBuffersManager::CommitPerFboCB()
 {
 	CommitCBufferFromCStruct(m_perFboCbId, m_perFboCb);
+}
+
+void SystemCBuffersManager::CommitLightsCB()
+{
+	CommitCBufferFromCStruct(m_lightsCbId, m_lightsCb);
 }
 
 void SystemCBuffersManager::CommitUIConfigCB()

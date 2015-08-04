@@ -33,9 +33,9 @@ struct PerObjectCB{
 
 struct DirLightCBStruct
 {
-	vec3 m_color;
+	vec3 m_direction;
 	CB_PAD_FLOAT(1)
-		vec3 m_direction;
+	vec3 m_color;
 	CB_PAD_FLOAT(1)
 };
 
@@ -54,14 +54,22 @@ struct PerLightCB{
 struct PerMaterialCB{
 	vec3 ka;
 	CB_PAD_FLOAT(1)
-		vec3 kd;
+	vec3 kd;
 	CB_PAD_FLOAT(1)
-		vec3 ks;
+	vec3 ks;
 	float shininess;
 };
 
 struct PerFboCB{
 	vec4 FboDimensions[16];
+};
+
+#define MAX_SHADER_LIGHTS 16
+
+struct LightsCB{
+	DirLightCBStruct dirLights[16];
+	int numDirLights;
+	CB_PAD_FLOAT(3);
 };
 
 struct UIConfigCB{
@@ -102,6 +110,8 @@ public:
 	static GLuint m_perMaterialCbId;
 	static PerFboCB m_perFboCb;
 	static GLuint m_perFboCbId;
+	static LightsCB m_lightsCb;
+	static GLuint m_lightsCbId;
 	static UIConfigCB m_UIConfigCb;
 	static GLuint m_UIConfigCbId;
 
@@ -112,6 +122,7 @@ public:
 	static void CommitPerLightCB();
 	static void CommitPerMaterialCB();
 	static void CommitPerFboCB();
+	static void CommitLightsCB();
 	static void CommitUIConfigCB();
 
 	static PerFrameCB& GetMutablePerFrameCB() { return m_perFrameCb; }
@@ -120,6 +131,7 @@ public:
 	static PerLightCB& GetMutablePerLightCB() { return m_perLightCb; }
 	static PerMaterialCB& GetMutablePerMaterialCB() { return m_perMaterialCb; }
 	static PerFboCB& GetMutablePerFboCB() { return m_perFboCb; }
+	static LightsCB& GetMutableLightsCB() { return m_lightsCb;  }
 	static UIConfigCB& GetMutableUIConfigCB() { return m_UIConfigCb; }
 };
 

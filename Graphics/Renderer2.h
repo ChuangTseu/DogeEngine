@@ -42,6 +42,8 @@ public:
 	static Renderer2* GetInstance();
 
 	void RegisterLight(const Light& light);
+	void RegisterDirLight(const DirLight& dirLight);
+
 	void RegisterShadowEmittingLight(const ShadowEmittingLight& light);
 	void RegisterRenderableObject(const RenderableObject& object);
 	void RegisterViewPoint(const ViewPoint& viewPoint);
@@ -97,6 +99,9 @@ private:
 	int m_height;
 
 	std::vector<const Light*> m_lights;
+
+	std::vector<const DirLight*> m_dirLights;
+
 	std::vector<const ShadowEmittingLight*> m_shadowEmittingLights;
 
 	std::vector<const ViewPoint*> m_viewPoints;
