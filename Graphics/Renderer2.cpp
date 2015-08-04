@@ -90,7 +90,14 @@ static PipelineState GetSimple3D_PipelineState()
 
 	BlendState& bs = simple3D_pipelineState.m_blendState;
 
-	bs.bBlend = false;
+	bs.bBlend = true;
+	bs.blend.srcFactorRgb = EGlSrcFactor_ONE;
+	bs.blend.dstFactorRgb = EGlDstFactor_ONE;
+	bs.blend.opRgb = EGlBlendOp_FUNC_ADD;
+	//bs.blend.srcFactorAlpha = EGlSrcFactor_ONE;
+	//bs.blend.dstFactorAlpha = EGlDstFactor_ONE;
+	//bs.blend.opAlpha = EGlBlendOp_MAX;
+	bs.blend.factor = { 1.f, 1.f, 1.f, 1.f };
 	bs.blendMask = { true, true, true, true }; // COLOR WRITE ALL
 
 	return simple3D_pipelineState;
@@ -108,7 +115,7 @@ static RenderPassDesc Simple3D_3DPassDesc{
 			{}
 		},
 		std::vector<FBOColorEntryDesc>{ 
-			{ "SceneRender", -666, EFBOTargetClearMode_CLEAR_BEFORE_USE, { 0.f, 1.f, 1.f, 0.f } }
+			{ "SceneRender", -666, EFBOTargetClearMode_CLEAR_BEFORE_USE, { 0.f, 0.7f, 0.7f, 0.f } }
 		}, 
 			FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
 	},
@@ -237,6 +244,29 @@ static RenderPassDesc GetStandardIntermediateScreenSpaceDesc(
 	};
 }
 
+static RenderPassDesc FillRed_ScreenPass
+{
+	/*inTextures : */{},
+	/*FBODesc : */			RenderPassFBODesc{
+		/*useDefaultColor : */	false,
+		/*useDefaultDepth : */	true,
+		/*fboSizeHeuristic : */{
+			EFBOTargetSizeMode_USE_SCREEN_SIZE, {}, {},
+			EFBOTargetBeforeResizeModifier_NONE, {}
+		},
+		/*colorTargets : */		std::vector<FBOColorEntryDesc>{{ "", -666, EFBOTargetClearMode_NO_CLEAR, {} }},
+		/*depthTarget : */		FBODepthStencilEntryDesc{ -666, EFBOTargetClearMode_NO_CLEAR, {} }
+	},
+	/*shaderDesc : */		ShaderDesc{
+		{ true, false, false, false, true },
+		{ "screenQuadById.vert", "", "", "", "fillRed.frag" }
+			},
+			/*pipelineState : */	GetScreenSpacePass_PipelineState(),
+			/*inputType : */		EPassInputType_ScreenQuadById,
+			/*inputVisibility : */	EVisibility_Any,
+			/*isLighting : */		ELightingMode_NO_LIGHTING
+};
+
 //static RenderPassDesc Downscale4x4_ScreenPassDesc{
 //	/*inTextures : */		std::vector<RenderPassTextureInputDesc>{{0, "", -666}},
 //	/*FBODesc : */			RenderPassFBODesc{ false, true, {
@@ -256,6 +286,7 @@ static RenderPassDesc GetStandardIntermediateScreenSpaceDesc(
 static RenderGraphDesc defaultRenderGraph_ScenePhotoDesc{
 	// Passes vector
 	{
+		//FillRed_ScreenPass
 		ZPRepass_3DPassDesc,
 		Simple3D_3DPassDesc,
 		//Downscale2x2_ScreenPassDesc,
@@ -264,8 +295,6 @@ static RenderGraphDesc defaultRenderGraph_ScenePhotoDesc{
 		//GetStandardIntermediateScreenSpaceDesc(EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4, EFBOTargetBeforeResizeModifier_NONE, "downscale4x4.frag"),
 		//GetStandardIntermediateScreenSpaceDesc(EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_4x4, EFBOTargetBeforeResizeModifier_NONE, "downscale4x4.frag"),
 		//GetStandardIntermediateScreenSpaceDesc(EFBOTargetSizeMode_USE_PREVIOUS_DOWNSCALED_2x2, EFBOTargetBeforeResizeModifier_NONE, "downscale2x2.frag")
-		//FakeTonemap_ScreenPassDesc,
-		//KeepRedOnly_ScreenPassDesc
 	}
 };
 
@@ -485,7 +514,25 @@ void Renderer2::DeployRenderGraph(const RenderGraph& renderGraph) const
 
 				SystemCBuffersManager::GetMutableLightsCB().numDirLights = 1;
 
-				for (int nDirLight = 0; nDirLight < dirLightsCount; ++nDirLight)
+				GLboolean restoreBlendEnabled;
+				glGetBooleanv(GL_BLEND, &restoreBlendEnabled);
+				glDisable(GL_BLEND);
+
+				int nDirLight = 0;
+				for (; nDirLight < 1; ++nDirLight)
+				{
+					const DirLight* pDirLight = m_dirLights[nDirLight];
+
+					SystemCBuffersManager::GetMutableLightsCB().dirLights[0].m_color = pDirLight->m_color;
+					SystemCBuffersManager::GetMutableLightsCB().dirLights[0].m_direction = pDirLight->m_direction;
+
+					SystemCBuffersManager::CommitLightsCB();
+					RenderPassWithInput(renderPass);
+				}
+
+				if (restoreBlendEnabled) glEnable(GL_BLEND);
+
+				for (; nDirLight < dirLightsCount; ++nDirLight)
 				{
 					const DirLight* pDirLight = m_dirLights[nDirLight];
 
